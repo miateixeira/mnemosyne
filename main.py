@@ -76,6 +76,7 @@ class FlashcardApp(QMainWindow):
 
         self.generalLayout = QHBoxLayout()
         centralWidget = QWidget(self)
+        # centralWidget.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled)
         centralWidget.setLayout(self.generalLayout)
         self.setCentralWidget(centralWidget)
 
