@@ -2,6 +2,7 @@ import os
 import sys
 import json
 from datetime import datetime
+import random
 
 from PyQt6.QtCore import Qt
 
@@ -93,7 +94,9 @@ class FlashcardDeck:
 
     def update_pending(self):
         """ update the list of cards pending for review """
-        self.pending_flashcards = [card for card in self.flashcards if self.check_pending(card)]
+        pending_list = [card for card in self.flashcards if self.check_pending(card)]
+        random.shuffle(pending_list)
+        self.pending_flashcards = pending_list
 
     def load_srs_method(self):
         """ load the key for appropriate srs method """
