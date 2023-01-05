@@ -1,9 +1,10 @@
 import os
 import sys
 import json
+from datetime import datetime
 
 from PyQt6.QtCore import Qt
-# from PyQt6.QtGui import *
+
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -26,36 +27,133 @@ POP_UP_HEIGHT = 250
 DECK_DIRECTORY = "./decks/"
 
 class Flashcard:
-    # " needs to have a Q/A
-    # " keep track of last time reviewed
-    def __init__(self, question, answer, last_review):
-        self.question = question
-        self.answer = answer
-        self.last_review = last_review
+    def __init__(self, flashcard_dict):
+        self.front    = flashcard_dict['front'] 
+        self.back      = flashcard_dict['back'] 
+        self.last_review = flashcard_dict['last_review']
+        self.mem_level   = flashcard_dict['mem_level'] 
 
-class FlashcardDeck():
+    def get_front(self):
+        return self.front
+
+    def get_back(self):
+        return self.back
+
+    def get_mem_level(self):
+        return self.mem_level
+
+    def get_last_review(self):
+        return self.last_review
+
+    def get_as_dict(self):
+        """ return flashcard object as a dict """
+
+        card_dict = {}
+
+        card_dict['front'] = self.front 
+        card_dict['back'] = self.back
+        card_dict['last_review'] = self.last_review
+        card_dict['mem_level'] = self.mem_level
+
+        return card_dict
+
+class FlashcardDeck:
     def __init__(self, deck_name):
-        # " initialize deck or create new if doesn't exist
-        deck_file_name = DECK_DIRECTORY + deck_name + ".json"
-        print("Initializing deck at " + deck_file_name)
+        # initialize deck or create new if doesn't exist
+        self.deck_name = deck_name
+        self.deck_file_name = DECK_DIRECTORY + self.deck_name + ".json"
 
-        with open(deck_file_name, "r") as f:
+        with open(self.deck_file_name, "r") as f:
             self.deck = json.load(f)
 
+        # get srs_method and load key
+        self.load_srs_method()
+
+        # get list of flashcard objects
+        self.load_flashcards()
+
+    def load_flashcards(self):
+        """ Load all the flashcard dicts are Flaschard objects """
+
+        flashcards = self.deck.get("flashcards")
+        self.flashcards = [Flashcard(x) for x in flashcards]
+
+        self.update_pending()
+
+    def update_pending(self):
+        """ update the list of cards pending for review """
+        self.pending_flashcards = [card for card in self.flashcards if self.check_pending(card)]
+
+    def load_srs_method(self):
+        """ load the key for appropriate srs method """
+
         self.srs_method = self.deck.get("srs_method")
-        self.flashcards = self.deck.get("flashcards")
 
-    # def load_flashcards(self):
-        # " read deck file
+        # Fibonacci: there are 9 memory levels, after which
+        #            the flashcard will be shown every 21 days
+        if self.srs_method == "Fibonacci":
+            # keys correspond to the memory level of the flashcard
+            # values correspond to the number of days that must pass
+            #     before the next time the flashcard is shown
+            self.srs_key = {0:0, 1:1, 2:1, 3:2, 4:3, 5:5, 6:8, 7:13, 8:21}
 
-    # def save_flashcards(self):
-        # " write deck to file
+    def get_total_number_of_cards(self):
+        """ return total number of cards in deck """
+        return len(self.flashcards)
 
-    # def add_flashcard(self, flashcard):
-        # " add flashcard to deck
+    def check_pending(self, flashcard):
+        """ returns True if the flashcard is pending for review """
 
-    # def get_next_flashcard(self):
-        # " return a pending flashcard
+        curr_time = datetime.now()
+        last_review_time = flashcard.get_last_review()
+
+        # convert to datetime if needed
+        if type(last_review_time) == str:
+            time_format = "%Y-%m-%d %H:%M:%S.%f"
+            last_review_time = datetime.strptime(last_review_time, time_format)
+
+        delta_time = curr_time - last_review_time
+
+        # more time has elapsed than required at current mem level
+        if delta_time.days >= self.srs_key[flashcard.get_mem_level()]:
+            return True
+
+        return False
+
+    def get_number_pending(self):
+        """ return number of cards pending for review """
+        return len(self.pending_flashcards)
+
+    def get_deck_name(self):
+        """ return the name of the deck """
+        return self.deck_name
+
+    def add_flashcard(self, front, back):
+        """ add flashcard to deck """
+
+        # create dict with card info
+        card_info_dict = {}
+        card_info_dict['front'] = front
+        card_info_dict['back'] = back
+        card_info_dict['last_review'] = datetime.now()
+        card_info_dict['mem_level'] = 0
+
+        # add card to deck
+        new_card = Flashcard(card_info_dict)
+        self.flashcards.append(new_card)
+
+        self.update_pending()
+        self.save_deck()
+
+    def save_deck(self):
+        """ write the deck as a json """
+        deck_dict = {}
+        deck_dict['srs_method'] = self.srs_method
+        deck_dict['flashcards'] = [x.get_as_dict() for x in self.flashcards]
+
+        # write to json file
+        with open(self.deck_file_name, "w") as f:
+            json.dump(deck_dict, f, indent=4, default=str)
 
 class FlashcardApp(QMainWindow):
     """
@@ -97,6 +195,15 @@ class FlashcardApp(QMainWindow):
 
         # Init deck selector
         self.init_deck_selector()
+
+        # add a spacer
+        self.sidebar.addStretch()
+
+        # create widgets for sidebar deck info
+        self.sidebar_card_total = QLabel()
+        self.sidebar.addWidget(self.sidebar_card_total)
+        self.sidebar_number_pending = QLabel()
+        self.sidebar.addWidget(self.sidebar_number_pending)
 
         # add a spacer
         self.sidebar.addStretch()
@@ -145,6 +252,106 @@ class FlashcardApp(QMainWindow):
 
         if deck_selection in self.decks:
             self.active_deck = FlashcardDeck(deck_selection)
+            self.update_sidebar()
+            self.init_add_button()
+
+    def update_sidebar(self):
+        """ Update the sidebar with total number of cards and number pending """
+        # Display total number of cards
+        card_total = self.active_deck.get_total_number_of_cards()
+        card_total_text = str(card_total) + " cards in this deck"
+        self.sidebar_card_total.setText(card_total_text)
+
+        # Display number of cards pending for review
+        number_pending = self.active_deck.get_number_pending()
+        number_pending_text = str(number_pending) + " cards pending for review"
+        self.sidebar_number_pending.setText(number_pending_text)
+
+    def init_add_button(self):
+        self.add_card_button = QPushButton("Add card to deck")
+        self.sidebar.addWidget(self.add_card_button)
+        self.add_card_button.clicked.connect(self.add_card_button_clicked)
+
+    def add_card_button_clicked(self):
+        """ create pop up form for creating new card """
+
+        # create popup widget
+        self.new_card_pop_up = QWidget()
+        self.new_card_pop_up.setFixedSize(POP_UP_WIDTH, POP_UP_HEIGHT)
+
+        self.new_card_pop_up_layout = QVBoxLayout()
+        self.new_card_pop_up.setLayout(self.new_card_pop_up_layout)
+
+        # popup header
+        self.new_card_header = QLabel("Create new card for " + self.active_deck.get_deck_name())
+        self.new_card_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.new_card_pop_up_layout.addWidget(self.new_card_header)
+
+        # add spacing
+        self.new_card_pop_up_layout.addStretch()
+
+        # create input form for new card
+        self.new_card_form = QWidget()
+        self.new_card_form_layout = QFormLayout()
+        self.new_card_form.setLayout(self.new_card_form_layout)
+        self.new_card_pop_up_layout.addWidget(self.new_card_form)
+
+        # input for card front
+        self.card_front_line_edit = QLineEdit()
+        self.new_card_form_layout.addRow("Front:", self.card_front_line_edit)
+
+        # input for card back
+        self.card_back_line_edit = QLineEdit()
+        self.new_card_form_layout.addRow("Back:", self.card_back_line_edit)
+
+        # vertical spacing
+        self.new_card_pop_up_layout.addStretch()
+
+        # card creation confirmation
+        self.new_card_success = QLabel()
+        self.new_card_pop_up_layout.addWidget(self.new_card_success)
+
+        # vertical spacing
+        self.new_card_pop_up_layout.addStretch()
+
+        # new card navigation buttons
+        self.new_card_nav = QWidget()
+        self.new_card_nav_layout = QHBoxLayout()
+        self.new_card_nav.setLayout(self.new_card_nav_layout)
+        self.new_card_exit = QPushButton("Exit")
+        self.new_card_confirm = QPushButton("Confirm")
+        self.new_card_nav_layout.addWidget(self.new_card_exit)
+        self.new_card_nav_layout.addWidget(self.new_card_confirm)
+        self.new_card_pop_up_layout.addWidget(self.new_card_nav)
+
+        # button push signals
+        self.new_card_exit.clicked.connect(self.new_card_exit_clicked)
+        self.new_card_confirm.clicked.connect(self.new_card_confirm_clicked)
+
+        # render the popup
+        self.new_card_pop_up.show()
+
+    def new_card_exit_clicked(self):
+        """ close new card creation pop up """
+        self.new_card_pop_up.close()
+        self.update_sidebar()
+
+    def new_card_confirm_clicked(self):
+        """ confirm card creation and prompt for another """
+
+        # get user input
+        front = self.card_front_line_edit.text()
+        back = self.card_back_line_edit.text()
+
+        # create new card
+        self.active_deck.add_flashcard(front, back)
+
+        # clear line edit input
+        self.card_front_line_edit.clear()
+        self.card_back_line_edit.clear()
+
+        # show confirmation text
+        self.new_card_success.setText("New card created! Add another or exit.")
 
     def new_deck_pop_up(self):
         """ create pop up form for creating new deck """
