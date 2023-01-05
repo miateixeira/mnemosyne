@@ -15,10 +15,13 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QLabel,
     QLineEdit,
+    QTextEdit,
     QComboBox,
     QFrame,
     QPushButton,
     QMessageBox,
+    QSpacerItem,
+    QSizePolicy,
 )
 
 WINDOW_WIDTH = 700
@@ -29,8 +32,9 @@ DECK_DIRECTORY = "./decks/"
 
 class Flashcard:
     def __init__(self, flashcard_dict):
-        self.front    = flashcard_dict['front'] 
-        self.back      = flashcard_dict['back'] 
+        self.front       = flashcard_dict['front'] 
+        self.back        = flashcard_dict['back'] 
+        self.notes       = flashcard_dict['notes']
         self.last_review = flashcard_dict['last_review']
         self.mem_level   = flashcard_dict['mem_level'] 
 
@@ -39,6 +43,9 @@ class Flashcard:
 
     def get_back(self):
         return self.back
+
+    def get_notes(self):
+        return self.notes
 
     def get_mem_level(self):
         return self.mem_level
@@ -53,6 +60,7 @@ class Flashcard:
 
         card_dict['front'] = self.front 
         card_dict['back'] = self.back
+        card_dict['notes'] = self.notes
         card_dict['last_review'] = self.last_review
         card_dict['mem_level'] = self.mem_level
 
@@ -142,13 +150,14 @@ class FlashcardDeck:
         """ return the name of the deck """
         return self.deck_name
 
-    def add_flashcard(self, front, back):
+    def add_flashcard(self, front, back, notes):
         """ add flashcard to deck """
 
         # create dict with card info
         card_info_dict = {}
         card_info_dict['front'] = front
         card_info_dict['back'] = back
+        card_info_dict['notes'] = notes
         card_info_dict['last_review'] = datetime.now()
         card_info_dict['mem_level'] = 0
 
@@ -280,6 +289,15 @@ class FlashcardApp(QMainWindow):
         self.body_bottom.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.body_layout.addWidget(self.body_bottom)
 
+        # add spacer between card front/back and notes
+        self.spacer = QSpacerItem(0, 50, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.body_layout.addSpacerItem(self.spacer)
+
+        # field for notes in the body
+        self.body_notes = QLabel()
+        self.body_notes.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.body_layout.addWidget(self.body_notes)
+
         # vertical spacing
         self.body_layout.addStretch()
 
@@ -384,6 +402,10 @@ class FlashcardApp(QMainWindow):
         self.card_back_line_edit = QLineEdit()
         self.new_card_form_layout.addRow("Back:", self.card_back_line_edit)
 
+        # input for card notes
+        self.card_notes_text_edit = QTextEdit()
+        self.new_card_form_layout.addRow("Notes:", self.card_notes_text_edit)
+
         # vertical spacing
         self.new_card_pop_up_layout.addStretch()
 
@@ -423,13 +445,15 @@ class FlashcardApp(QMainWindow):
         # get user input
         front = self.card_front_line_edit.text()
         back = self.card_back_line_edit.text()
+        notes = self.card_notes_text_edit.toPlainText()
 
         # create new card
-        self.active_deck.add_flashcard(front, back)
+        self.active_deck.add_flashcard(front, back, notes)
 
         # clear line edit input
         self.card_front_line_edit.clear()
         self.card_back_line_edit.clear()
+        self.card_notes_text_edit.clear()
 
         # show confirmation text
         self.new_card_success.setText("New card created! Add another or exit.")
@@ -532,12 +556,14 @@ class FlashcardApp(QMainWindow):
         if not self.next_card:
             self.body_top.setText("All caught up!")
             self.body_bottom.setText("")
+            self.body_notes.setText("")
             self.clear_layout(self.body_nav_layout)
             return
 
         # present next flashcard
         self.body_top.setText(self.next_card.get_front())
         self.body_bottom.setText("")
+        self.body_notes.setText("")
 
         # reset nav buttons
         self.clear_layout(self.body_nav_layout)
@@ -560,6 +586,7 @@ class FlashcardApp(QMainWindow):
         
         # reveal back of flashcard
         self.body_bottom.setText(self.next_card.get_back())
+        self.body_notes.setText(self.next_card.get_notes())
 
         # clear the nav layout of buttons
         self.clear_layout(self.body_nav_layout)
