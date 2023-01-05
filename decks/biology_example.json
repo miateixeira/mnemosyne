@@ -1,0 +1,29 @@
+{
+    "srs_method": "Fibonacci",
+    "flashcards": [
+        {
+            "front": "Nonliving components of environment",
+            "back": "abiotic factors",
+            "last_review": "2023-01-04 21:35:37.080650",
+            "mem_level": 0
+        },
+        {
+            "front": "flowering plants",
+            "back": "angiosperms",
+            "last_review": "2023-01-04 21:35:50.305455",
+            "mem_level": 0
+        },
+        {
+            "front": "process by which a single parent reproduces by itself",
+            "back": "asexual reproduction",
+            "last_review": "2023-01-04 21:36:11.350507",
+            "mem_level": 0
+        },
+        {
+            "front": "single-celled organisms that lack a nucleus; prokaryotes",
+            "back": "bacteria",
+            "last_review": "2023-01-04 21:36:34.637083",
+            "mem_level": 0
+        }
+    ]
+}

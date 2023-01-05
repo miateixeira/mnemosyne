@@ -1,0 +1,47 @@
+{
+    "srs_method": "Fibonacci",
+    "flashcards": [
+        {
+            "front": "salve",
+            "back": "hello (formal)",
+            "last_review": "2023-01-04 21:32:26.923312",
+            "mem_level": 0
+        },
+        {
+            "front": "buongiorno",
+            "back": "good morning",
+            "last_review": "2023-01-04 21:32:36.513701",
+            "mem_level": 0
+        },
+        {
+            "front": "buonasera",
+            "back": "good evening",
+            "last_review": "2023-01-04 21:32:46.674264",
+            "mem_level": 0
+        },
+        {
+            "front": "ci vediamo presto",
+            "back": "see you soon",
+            "last_review": "2023-01-04 21:33:03.213971",
+            "mem_level": 0
+        },
+        {
+            "front": "Ho trentacinque anni",
+            "back": "I'm 35 years old",
+            "last_review": "2023-01-04 21:33:25.392721",
+            "mem_level": 0
+        },
+        {
+            "front": "Sono dottoressa",
+            "back": "I'm a doctor (female)",
+            "last_review": "2023-01-04 21:33:39.497191",
+            "mem_level": 0
+        },
+        {
+            "front": "Mi piace leggere romanzi in inglese",
+            "back": "I like to read novels in English",
+            "last_review": "2023-01-04 21:33:56.578364",
+            "mem_level": 0
+        }
+    ]
+}
