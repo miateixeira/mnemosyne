@@ -57,6 +57,17 @@ class Flashcard:
 
         return card_dict
 
+    def set_last_review(self, t):
+        self.last_review = t
+
+    def inc_mem_level(self):
+        if self.mem_level < 9:
+            self.mem_level += 1
+
+    def dec_mem_level(self):
+        if self.mem_level > 0:
+            self.mem_level -= 1
+
 class FlashcardDeck:
     def __init__(self, deck_name):
         # initialize deck or create new if doesn't exist
@@ -153,7 +164,37 @@ class FlashcardDeck:
 
         # write to json file
         with open(self.deck_file_name, "w") as f:
-            json.dump(deck_dict, f, indent=4, default=str)
+            json.dump(deck_dict, f, indent=4, default=str, ensure_ascii=False)
+
+    def get_next_flashcard(self):
+        """ return the next available pending flashcard """
+
+        if not self.pending_flashcards:
+            return None
+        
+        return self.pending_flashcards.pop()
+
+    def log_answer(self, curr_card, answer):
+        """ update flashcard with time last reviewed and new mem level """
+
+        for card in self.flashcards:
+            if card == curr_card:
+                card.set_last_review(datetime.now())
+
+                if answer:
+                    card.inc_mem_level()
+                else:
+                    card.dec_mem_level()
+
+                self.update_pending()
+
+                # TODO: this won't persist if app is closed before
+                # eventually getting this right in the same session
+                if not answer:
+                    self.pending_flashcards.append(curr_card)
+
+                self.save_deck()
+                return
 
 class FlashcardApp(QMainWindow):
     """
@@ -163,6 +204,7 @@ class FlashcardApp(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.add_button_exists = 0
         self.init_ui()
 
     def init_ui(self):
@@ -213,9 +255,41 @@ class FlashcardApp(QMainWindow):
         self.generalLayout.addWidget(self.sidebar_frame, 2)
 
     def init_body(self):
-        self.body = QLabel()
-        self.body.setText("Welcome!")
-        self.body.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        """ Initialize the body of the GUI """
+
+        # create body widget and layout
+        self.body = QWidget()
+        self.body_layout = QVBoxLayout()
+        self.body.setLayout(self.body_layout)
+
+        # vertical spacing
+        self.body_layout.addStretch()
+
+        # the top of the body
+        self.body_top = QLabel()
+        self.body_top.setText("Welcome!")
+        self.body_top.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.body_layout.addWidget(self.body_top)
+
+        # bottom row of the body
+        self.body_bottom = QLabel()
+        self.body_bottom.setText("Select a deck to get started")
+        self.body_bottom.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.body_layout.addWidget(self.body_bottom)
+
+        # vertical spacing
+        self.body_layout.addStretch()
+
+        # create body navigation widget
+        self.body_nav = QWidget()
+        self.body_nav_layout = QHBoxLayout()
+        self.body_nav.setLayout(self.body_nav_layout)
+        self.body_layout.addWidget(self.body_nav)
+
+        # vertical spacing
+        self.body_layout.addStretch()
+
+        # add body to GUI
         self.generalLayout.addWidget(self.body, 5)
 
     def init_deck_selector(self):
@@ -253,7 +327,9 @@ class FlashcardApp(QMainWindow):
         if deck_selection in self.decks:
             self.active_deck = FlashcardDeck(deck_selection)
             self.update_sidebar()
-            self.init_add_button()
+            self.update_body()
+            if not self.add_button_exists:
+                self.init_add_button()
 
     def update_sidebar(self):
         """ Update the sidebar with total number of cards and number pending """
@@ -268,6 +344,7 @@ class FlashcardApp(QMainWindow):
         self.sidebar_number_pending.setText(number_pending_text)
 
     def init_add_button(self):
+        self.add_button_exists = 1
         self.add_card_button = QPushButton("Add card to deck")
         self.sidebar.addWidget(self.add_card_button)
         self.add_card_button.clicked.connect(self.add_card_button_clicked)
@@ -335,6 +412,7 @@ class FlashcardApp(QMainWindow):
         """ close new card creation pop up """
         self.new_card_pop_up.close()
         self.update_sidebar()
+        self.update_body()
 
     def new_card_confirm_clicked(self):
         """ confirm card creation and prompt for another """
@@ -441,6 +519,69 @@ class FlashcardApp(QMainWindow):
             self.update_deck_selector()
             self.deck_selector.setCurrentText(deck_name)
             self.pop_up.close()
+
+    def update_body(self):   
+        """ Present user with a flashcard if available """
+
+        self.next_card = self.active_deck.get_next_flashcard()
+
+        # all caught up!
+        if not self.next_card:
+            self.body_top.setText("All caught up!")
+            self.body_bottom.setText("")
+            self.clear_layout(self.body_nav_layout)
+            return
+
+        # present next flashcard
+        self.body_top.setText(self.next_card.get_front())
+        self.body_bottom.setText("")
+
+        # reset nav buttons
+        self.clear_layout(self.body_nav_layout)
+
+        # create flip button
+        self.flip_button = QPushButton("Flip")
+        self.flip_button.setMaximumWidth(100)
+        self.flip_button.clicked.connect(self.flip_button_clicked)
+        self.body_nav_layout.addWidget(self.flip_button)
+
+    def clear_layout(self, layout):
+        """ clear all widgets from a layout"""
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+    def flip_button_clicked(self):
+        """ flip to back of flashcard """
+        
+        # reveal back of flashcard
+        self.body_bottom.setText(self.next_card.get_back())
+
+        # clear the nav layout of buttons
+        self.clear_layout(self.body_nav_layout)
+
+        # wrong answer :(
+        self.wrong_button = QPushButton("Needs more review")
+        self.wrong_button.setMaximumWidth(200)
+        self.wrong_button.clicked.connect(self.wrong_button_clicked)
+        self.body_nav_layout.addWidget(self.wrong_button)
+        
+        # right answer!
+        self.right_button = QPushButton("Got it!")
+        self.right_button.setMaximumWidth(200)
+        self.right_button.clicked.connect(self.right_button_clicked)
+        self.body_nav_layout.addWidget(self.right_button)
+
+    def right_button_clicked(self):
+        self.active_deck.log_answer(self.next_card, True)
+        self.update_body()
+        self.update_sidebar()
+
+    def wrong_button_clicked(self):
+        self.active_deck.log_answer(self.next_card, False)
+        self.update_body()
+        self.update_sidebar()
 
 def main():
     """PyCard's main function"""
