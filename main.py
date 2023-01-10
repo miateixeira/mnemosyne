@@ -204,6 +204,7 @@ class FlashcardDeck:
                 # eventually getting this right in the same session
                 if not answer:
                     self.pending_flashcards.append(curr_card)
+                    random.shuffle(self.pending_flashcards)
 
                 self.save_deck()
                 return
